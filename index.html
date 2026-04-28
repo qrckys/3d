@@ -2,77 +2,97 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Foundations AR</title>
-  
+  <title>FOUNDATION AR</title>
+
+  <link rel="preload" href="https://dddanimation.github.io/3d/enslaved.glb" as="fetch" crossorigin="anonymous">
+  <link rel="preload" href="https://dddanimation.github.io/3d/enslaved.mp3" as="fetch" crossorigin="anonymous">
+
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
 
   <style>
-    /* Force the background to be transparent so the video shows through */
-    html, body { 
-      margin: 0; padding: 0; width: 100%; height: 100%; 
-      overflow: hidden; 
-      background: transparent !important; 
-    }
-    
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+    body.loading-bg { background: #000 !important; }
+    body.ar-active  { background: transparent !important; }
+    a-scene { background: transparent !important; }
+
+    /* ── OVERLAY ── */
     #overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: #000; color: white; display: flex; flex-direction: column;
-      justify-content: center; align-items: center; z-index: 9999; font-family: sans-serif;
-    }
-    
-    #start-btn { 
-      padding: 18px 40px; font-size: 18px; background: #fff; color: #000; 
-      border: none; border-radius: 4px; cursor: pointer; font-weight: bold; 
-      text-transform: uppercase; 
+      justify-content: center; align-items: center; z-index: 9999;
+      font-family: sans-serif; text-align: center;
     }
 
-    #marker-preview { width: 150px; border: 1px solid #444; margin-bottom: 25px; }
-
-    /* UI Controls Container - Bottom UI */
-    #ui-controls {
-      position: fixed;
-      bottom: 40px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: none; /* Revealed after start */
-      gap: 15px;
-      z-index: 1000;
-      width: 90%;
-      justify-content: center;
+    #start-btn {
+      padding: 18px 40px; font-size: 18px; background: #28a745; color: #fff;
+      border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
+      text-transform: uppercase; letter-spacing: 1px;
     }
 
-    /* Solid Black Button Style */
-    .black-btn {
-      padding: 15px 25px;
-      background: #000;
-      color: #fff;
-      text-decoration: none;
-      border: 1px solid #444;
-      border-radius: 4px;
-      font-family: sans-serif;
-      font-weight: bold;
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      text-align: center;
-      min-width: 120px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    #marker-preview { width: 150px; border: 1px solid #444; margin-bottom: 25px; opacity: 0.8; }
+
+    #progress-container {
+      width: 240px; height: 4px; background: #222;
+      margin-top: 20px; border-radius: 2px; display: none; overflow: hidden;
     }
+    #progress-bar { width: 0%; height: 100%; background: #28a745; transition: width 0.3s ease; }
 
-    .black-btn:active { background: #333; }
+    #progress-text { font-size: 10px; margin-top: 15px; color: #666; display: none; letter-spacing: 2px; text-transform: uppercase; }
 
-    /* Hide the default MindAR UI */
-    .mindar-ui-scanning, .mindar-ui-loading { display: none !important; }
+    #error-msg { display: none; margin-top: 20px; padding: 12px 20px; background: #8b0000; border-radius: 4px; font-size: 13px; max-width: 280px; line-height: 1.5; }
+    #retry-btn { display: none; margin-top: 14px; padding: 12px 28px; font-size: 13px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+
+    /* ── SCAN RETICLE ── */
+    #scan-reticle { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 200px; height: 200px; z-index: 1000; display: none; pointer-events: none; }
+    #scan-reticle .corner { position: absolute; width: 28px; height: 28px; border-color: #fff; border-style: solid; opacity: 0.85; }
+    #scan-reticle .tl { top: 0; left: 0; border-width: 3px 0 0 3px; }
+    #scan-reticle .tr { top: 0; right: 0; border-width: 3px 3px 0 0; }
+    #scan-reticle .bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; }
+    #scan-reticle .br { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
+
+    @keyframes reticle-pulse {
+      0%, 100% { opacity: 0.85; transform: translate(-50%, -50%) scale(1); }
+      50% { opacity: 0.35; transform: translate(-50%, -50%) scale(0.93); }
+    }
+    #scan-reticle.scanning { animation: reticle-pulse 1.8s ease-in-out infinite; }
+
+    #scan-hint { position: fixed; bottom: 120px; width: 100%; text-align: center; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.8); font-family: sans-serif; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; z-index: 1000; display: none; font-weight: bold; }
+
+    #ui-controls { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 1000; width: 90%; justify-content: center; }
+    .black-btn { padding: 15px 25px; background: #000; color: #fff; text-decoration: none; border: 1px solid #444; border-radius: 4px; font-family: sans-serif; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; text-align: center; min-width: 120px; }
+
+    .a-enter-vr, .a-enter-ar, .a-orientation-modal { display: none !important; }
   </style>
 </head>
-<body>
+<body class="loading-bg">
+
+  <div id="scan-reticle" class="scanning">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+  </div>
+
+  <div id="scan-hint">Point camera at artwork</div>
 
   <div id="overlay">
-    <h1 style="letter-spacing: 3px; font-weight: 300; margin-bottom: 25px;">FOUNDATIONS</h1>
-    <img src="https://dddanimation.github.io/3d/enslaved.jpg" id="marker-preview">
-    <button id="start-btn">Enter Experience</button>
+    <h1 style="letter-spacing: 5px; font-weight: 300; margin-bottom: 5px;">FOUNDATION</h1>
+    <p style="font-size: 10px; letter-spacing: 2px; text-transform: uppercase; margin-top: 0; margin-bottom: 30px; opacity: 0.6;">By Qrcky</p>
+
+    <div id="status-container">
+      <img src="https://dddanimation.github.io/3d/enslaved.jpg" id="marker-preview" alt="Target">
+      <br>
+      <button id="start-btn">Enter Experience</button>
+
+      <div id="progress-container">
+        <div id="progress-bar"></div>
+      </div>
+      <p id="progress-text">Initializing...</p>
+      <div id="error-msg"></div>
+      <button id="retry-btn">Try Again</button>
+    </div>
   </div>
 
   <div id="ui-controls">
@@ -80,53 +100,150 @@
     <a href="https://www.qrcky.net/prints/" target="_blank" class="black-btn">Get Prints</a>
   </div>
 
-  <a-scene 
-    mindar-image="imageTargetSrc: https://dddanimation.github.io/3d/targets.mind; autoStart: false; uiScanning: false; uiLoading: false; maxTrack: 1; filterMinCF: 0.0001; filterBeta: 0.001;" 
-    color-space="sRGB" 
-    renderer="colorManagement: true, physicallyCorrectLights: true, alpha: true" 
-    vr-mode-ui="enabled: false" 
+  <a-scene
+    mindar-image="imageTargetSrc: https://dddanimation.github.io/3d/targets.mind; autoStart: false; uiScanning: false; uiLoading: false; maxTrack: 1; filterMinCF: 0.001; filterBeta: 0.001;"
+    color-space="sRGB"
+    renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true"
+    vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false">
-    
-    <a-assets>
-      <a-asset-item id="sculpture" src="https://dddanimation.github.io/3d/enslaved.glb"></a-asset-item>
+
+    <a-assets timeout="30000">
+      <a-asset-item id="sculpture" src="https://dddanimation.github.io/3d/enslaved.glb" crossorigin="anonymous"></a-asset-item>
+      <audio id="audio-file" src="https://dddanimation.github.io/3d/enslaved.mp3" preload="auto" crossorigin="anonymous" loop></audio>
     </a-assets>
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-light type="ambient" intensity="1.2"></a-light>
 
-    <a-light type="ambient" intensity="0.5"></a-light>
-    <a-light type="directional" position="1 2 1" intensity="0.7"></a-light>
-
-    <a-entity mindar-image-target="targetIndex: 0">
-      <a-gltf-model 
-        src="#sculpture" 
-        position="0 0.0 0.0" 
-        scale="0.17 0.17 0.17"
-        rotation="90 0 0"
-        animation-mixer>
-      </a-gltf-model>
+    <a-entity mindar-image-target="targetIndex: 0" id="mural-target">
+      <a-gltf-model src="#sculpture" position="0.0 -0.425 0.0" scale="0.048 0.048 0.048" animation-mixer></a-gltf-model>
     </a-entity>
   </a-scene>
 
   <script>
     const startBtn = document.getElementById('start-btn');
+    const retryBtn = document.getElementById('retry-btn');
     const overlay = document.getElementById('overlay');
-    const uiControls = document.getElementById('ui-controls');
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const errorMsg = document.getElementById('error-msg');
     const sceneEl = document.querySelector('a-scene');
+    const audioEl = document.getElementById('audio-file');
+    const scanHint = document.getElementById('scan-hint');
+    const scanReticle = document.getElementById('scan-reticle');
+    const uiControls = document.getElementById('ui-controls');
+    const muralTarget = document.getElementById('mural-target');
+
+    let targetActive = false;
+    let userNavigatedAway = false;
+    let audioCtx = null;
+    let gainNode = null;
+    let fadeRaf = null;
+    const FADE_MS = 600;
+
+    function ensureAudioGraph() {
+      if (audioCtx) return;
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0;
+        gainNode.connect(audioCtx.destination);
+        audioCtx.createMediaElementSource(audioEl).connect(gainNode);
+      } catch (e) { audioCtx = null; }
+    }
+
+    function fadeTo(targetVol) {
+      cancelAnimationFrame(fadeRaf);
+      if (!gainNode) {
+        if (targetVol > 0) audioEl.play().catch(() => {});
+        else audioEl.pause();
+        return;
+      }
+      const start = performance.now();
+      const startVol = gainNode.gain.value;
+      const delta = targetVol - startVol;
+      function step(now) {
+        const t = Math.min(1, (now - start) / FADE_MS);
+        const ease = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+        gainNode.gain.value = startVol + delta * ease;
+        if (t < 1) fadeRaf = requestAnimationFrame(step);
+        else if (targetVol === 0) audioEl.pause();
+      }
+      if (targetVol > 0 && audioEl.paused) audioEl.play().catch(() => {});
+      fadeRaf = requestAnimationFrame(step);
+    }
+
+    function setAudioPlaying(shouldPlay) {
+      ensureAudioGraph();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      fadeTo(shouldPlay ? 1 : 0);
+    }
+
+    function unlockAudio() {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) { const t = new Ctx(); t.resume().then(() => t.close()); }
+      } catch (e) {}
+    }
+
+    let simProgress = 0;
+    let simInterval = null;
+
+    function startSimProgress() {
+      simInterval = setInterval(() => {
+        simProgress += (99 - simProgress) * 0.04;
+        renderProgress(simProgress);
+      }, 120);
+    }
+
+    function renderProgress(val) {
+      const v = Math.min(100, val);
+      progressBar.style.width = v + '%';
+      let status = 'DOWNLOADING...';
+      if (v > 60) status = 'LOADING MODEL...';
+      if (v >= 100) status = 'READY';
+      progressText.innerText = `${status} ${Math.round(v)}%`;
+    }
 
     startBtn.addEventListener('click', () => {
-      document.body.style.backgroundColor = "transparent";
-      sceneEl.systems["mindar-image-system"].start(); 
-      // Reveal the Instagram and Print buttons
-      uiControls.style.display = "flex";
+      unlockAudio();
+      startBtn.style.display = 'none';
+      progressContainer.style.display = 'block';
+      progressText.style.display = 'block';
+      startSimProgress();
+      if (sceneEl.hasLoaded) sceneEl.systems['mindar-image-system'].start();
+      else sceneEl.addEventListener('loaded', () => sceneEl.systems['mindar-image-system'].start());
     });
 
-    sceneEl.addEventListener("arReady", () => {
-      overlay.style.display = "none";
+    sceneEl.addEventListener('arReady', () => {
+      clearInterval(simInterval);
+      renderProgress(100);
+      setTimeout(() => {
+        document.body.classList.remove('loading-bg');
+        overlay.style.display = 'none';
+        scanHint.style.display = 'block';
+        scanReticle.style.display = 'block';
+      }, 800);
     });
 
-    // Final insurance for background transparency
-    sceneEl.addEventListener("targetFound", () => {
-        document.body.style.backgroundColor = "transparent";
+    muralTarget.addEventListener('targetFound', () => {
+      targetActive = true;
+      scanReticle.style.display = 'none';
+      scanHint.style.display = 'none';
+      uiControls.style.display = 'flex';
+      setAudioPlaying(true);
+    });
+
+    muralTarget.addEventListener('targetLost', () => {
+      setTimeout(() => {
+        if (!targetActive) return;
+        targetActive = false;
+        scanReticle.style.display = 'block';
+        scanHint.style.display = 'block';
+        uiControls.style.display = 'none';
+        setAudioPlaying(false);
+      }, 1500);
     });
   </script>
 </body>
